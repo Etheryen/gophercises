@@ -1,8 +1,6 @@
 package quiz
 
 import (
-	"01-quiz/state"
-	"01-quiz/timer"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -42,35 +40,56 @@ func ParseRecords(
 	return result, nil
 }
 
-func askQuestionCheckAnswer(questionAnswer QuestionAnswer, number int) bool {
+func askQuestionCheckAnswer(
+	questionAnswer QuestionAnswer,
+	number int,
+	resultChan chan bool,
+) {
 	fmt.Printf("Problem #%v: %v = ", number, questionAnswer.question)
 
 	var userAnswer string
-
 	fmt.Scanln(&userAnswer)
-
 	cleanedAnswer := strings.ToLower(strings.Trim(userAnswer, " "))
+	cleanedCorrectAnswer := strings.ToLower(
+		strings.Trim(questionAnswer.answer, " "),
+	)
 
-	return cleanedAnswer == questionAnswer.answer
+	resultChan <- cleanedAnswer == cleanedCorrectAnswer
+}
+
+func announce(duration time.Duration, questionsAmount int) {
+	fmt.Printf(
+		"The quiz is about to start, you will have %v to answer %v questions, good luck! Hit enter when ready...",
+		duration,
+		questionsAmount,
+	)
+	fmt.Scanln()
+	fmt.Println("GOOO!!!")
 }
 
 func Start(
 	questionsAnswers []QuestionAnswer,
 	timerDuration time.Duration,
-) error {
-	state.QuestionsTotal = len(questionsAnswers)
+) int {
+	announce(timerDuration, len(questionsAnswers))
 
-	err := timer.Start(timerDuration)
-	if err != nil {
-		return err
-	}
+	timer := time.NewTimer(timerDuration)
+	resultChan := make(chan bool)
+	score := 0
 
 	for i, questionAnswer := range questionsAnswers {
-		isCorrect := askQuestionCheckAnswer(questionAnswer, i+1)
-		if isCorrect {
-			state.Score++
+		go askQuestionCheckAnswer(questionAnswer, i+1, resultChan)
+
+		select {
+		case <-timer.C:
+			fmt.Println("\nTime's up!")
+			return score
+		case isCorrect := <-resultChan:
+			if isCorrect {
+				score++
+			}
 		}
 	}
 
-	return nil
+	return score
 }

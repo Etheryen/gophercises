@@ -3,9 +3,9 @@ package main
 import (
 	"01-quiz/flags"
 	"01-quiz/quiz"
-	"01-quiz/state"
 	"01-quiz/utils"
 	"encoding/csv"
+	"fmt"
 	"log"
 	"strings"
 )
@@ -30,10 +30,13 @@ func main() {
 		log.Fatalln("Error parsing records:", err.Error())
 	}
 
-	err = quiz.Start(parsed, timerDuration)
-	if err != nil {
-		log.Fatalln("Error during quiz:", err.Error())
-	}
+	score := quiz.Start(parsed, timerDuration)
 
-	state.PrintResults()
+	perentage := 100 * score / len(parsed)
+	fmt.Printf(
+		"Score: %v/%v, that's %v%%!\n",
+		score,
+		len(parsed),
+		perentage,
+	)
 }

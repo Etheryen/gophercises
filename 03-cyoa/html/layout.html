@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Choose Your Own Adventure</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css"
+    />
+  </head>
+  <body>
+    <main class="container">
+      <h1>{{.Title}}</h1>
+      {{range .Paragraphs}}
+      <p>{{.}}</p>
+      {{end}} {{if .Options}}
+      <!-- <ul> -->
+      <!--   {{range .Options}} -->
+      <!--   <li><a href="/{{.Arc}}">{{.Text}}</a></li> -->
+      <!--   {{end}} -->
+      <!-- </ul> -->
+      <div class="grid">
+        {{range .Options}}
+        <a href="/{{.Arc}}" role="button">{{.Text}}</a>
+        {{end}}
+      </div>
+      {{else}}
+      <h3>The End</h3>
+      {{end}}
+    </main>
+  </body>
+</html>
+
+<style>
+  a[role="button"] {
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    text-wrap: balance;
+    justify-content: center;
+  }
+
+  .container > h3 {
+    text-align: center;
+  }
+</style>

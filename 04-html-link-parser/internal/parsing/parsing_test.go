@@ -1,6 +1,7 @@
 package parsing
 
 import (
+	"bytes"
 	"os"
 	"reflect"
 	"testing"
@@ -20,7 +21,8 @@ func TestEx1(t *testing.T) {
 	htmlData, _ := os.ReadFile("test_data/ex1.html")
 	want := []Link{{Href: "/other-page", Text: "A link to another page"}}
 
-	result, err := ParseLinks(htmlData)
+	r := bytes.NewReader(htmlData)
+	result, err := ParseLinks(r)
 	if err != nil {
 		t.Fatalf("Error parsing links: %v", err)
 	}
@@ -42,7 +44,8 @@ func TestEx2(t *testing.T) {
 		},
 	}
 
-	result, err := ParseLinks(htmlData)
+	r := bytes.NewReader(htmlData)
+	result, err := ParseLinks(r)
 	if err != nil {
 		t.Fatalf("Error parsing links: %v", err)
 	}
@@ -68,7 +71,8 @@ func TestEx3(t *testing.T) {
 		},
 	}
 
-	result, err := ParseLinks(htmlData)
+	r := bytes.NewReader(htmlData)
+	result, err := ParseLinks(r)
 	if err != nil {
 		t.Fatalf("Error parsing links: %v", err)
 	}
@@ -86,7 +90,8 @@ func TestEx4(t *testing.T) {
 		},
 	}
 
-	result, err := ParseLinks(htmlData)
+	r := bytes.NewReader(htmlData)
+	result, err := ParseLinks(r)
 	if err != nil {
 		t.Fatalf("Error parsing links: %v", err)
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"04-html-link-parser/internal/parsing"
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -13,7 +14,8 @@ func main() {
 		log.Fatalln("Error reading file:", err)
 	}
 
-	parsed, err := parsing.ParseLinks(htmlData)
+	r := bytes.NewReader(htmlData)
+	parsed, err := parsing.ParseLinks(r)
 	if err != nil {
 		log.Fatalln("Error parsing links:", err)
 	}

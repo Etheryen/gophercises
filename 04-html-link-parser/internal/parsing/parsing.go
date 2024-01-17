@@ -1,7 +1,7 @@
 package parsing
 
 import (
-	"bytes"
+	"io"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -12,8 +12,7 @@ type Link struct {
 	Text string
 }
 
-func ParseLinks(htmlData []byte) ([]Link, error) {
-	r := bytes.NewReader(htmlData)
+func ParseLinks(r io.Reader) ([]Link, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
 		return nil, err

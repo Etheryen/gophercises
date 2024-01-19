@@ -3,6 +3,7 @@ package sitemap
 import (
 	"05-sitemap-builder/internal/pkg/links"
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,64 +12,101 @@ import (
 	"strings"
 )
 
-type SiteNode struct {
-	Location string
-	Children []SiteNode
+const xmlns = "http://www.sitemaps.org/schemas/sitemap/0.9"
+
+type urlset struct {
+	Urls  []loc  `xml:"url"`
+	Xmlns string `xml:"xmlns,attr"`
 }
 
-func Build(urlString string) (SiteNode, error) {
+type loc struct {
+	Value string `xml:"loc"`
+}
+
+func Build(urlString string, maxDepth int) ([]byte, error) {
 	normalizedUrl := normalized(urlString)
-	visited := []string{normalizedUrl}
-	return getSiteNode(normalizedUrl, visited)
-}
-
-func normalized(urlString string) string {
-	if !strings.HasSuffix(urlString, "/") {
-		return urlString + "/"
-	}
-	return urlString
-}
-
-func getSiteNode(urlString string, visited []string) (SiteNode, error) {
-	validHrefs, err := getValidHrefs(urlString)
+	urls, err := bfs(normalizedUrl, maxDepth)
 	if err != nil {
-		return SiteNode{}, err
+		return nil, err
+	}
+	return encodeXml(urls)
+}
+
+func encodeXml(urls []string) ([]byte, error) {
+	toEncode := urlset{
+		Xmlns: xmlns,
 	}
 
-	fmt.Println("\nLocation:", urlString)
-	fmt.Printf("Children: %v\n\n", validHrefs)
+	for _, page := range urls {
+		toEncode.Urls = append(toEncode.Urls, loc{page})
+	}
 
-	var childrenNodes []SiteNode
+	var buf bytes.Buffer
 
-	for _, href := range validHrefs {
-		if !slices.Contains(visited, href) {
-			visited = append(visited, href)
-			childNode, err := getSiteNode(href, visited)
-			if err != nil {
-				return SiteNode{}, err
+	buf.WriteString(xml.Header)
+
+	enc := xml.NewEncoder(&buf)
+	enc.Indent("", "  ")
+
+	err := enc.Encode(toEncode)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := io.ReadAll(&buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func bfs(urlString string, maxDepth int) ([]string, error) {
+	visited := make(map[string]struct{})
+
+	var queue map[string]struct{}
+	nextQueue := map[string]struct{}{
+		urlString: {},
+	}
+
+	for i := 0; i <= maxDepth; i++ {
+		queue, nextQueue = nextQueue, make(map[string]struct{})
+		if len(queue) == 0 {
+			break
+		}
+		for queuedUrl := range queue {
+			if _, ok := visited[queuedUrl]; ok {
+				continue
 			}
-			childrenNodes = append(childrenNodes, childNode)
-		} else {
-			childrenNodes = append(childrenNodes, SiteNode{href, nil})
+			visited[queuedUrl] = struct{}{}
+
+			hrefs, err := getValidHrefs(queuedUrl)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, href := range hrefs {
+				if _, ok := visited[href]; !ok {
+					nextQueue[href] = struct{}{}
+				}
+			}
 		}
 	}
 
-	node := SiteNode{
-		Location: urlString,
-		Children: childrenNodes,
+	result := make([]string, 0, len(visited))
+	for visitedUrl := range visited {
+		result = append(result, visitedUrl)
 	}
 
-	return node, nil
+	return result, nil
 }
-
-// TODO: remove foreign domain links, add domain to relative ones,
-// 		 maybe normalize the rest (add protocol or sth)
 
 func getValidHrefs(urlString string) ([]string, error) {
 	resp, err := http.Get(urlString)
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -86,19 +124,13 @@ func getValidHrefs(urlString string) ([]string, error) {
 	var result []string
 
 	for _, link := range siteLinks {
-		// FIXME: make it so that links to HOME
-		//		  (e.g. / or domainUrl) still get added
-		if link.Href == urlString ||
-			(link.Href == "/" && urlString == domainUrl) {
-			continue
-		}
 		if strings.HasPrefix(link.Href, "/") {
-			link.Href = domainUrl + link.Href[1:]
+			link.Href = domainUrl + link.Href
 		}
 		if strings.HasPrefix(link.Href, domainUrl) {
-			linkWithoutQuery := cleaned(link.Href)
-			if !slices.Contains(result, linkWithoutQuery) {
-				result = append(result, linkWithoutQuery)
+			normalizedLink := normalized(link.Href)
+			if !slices.Contains(result, normalizedLink) {
+				result = append(result, normalizedLink)
 			}
 		}
 	}
@@ -106,19 +138,19 @@ func getValidHrefs(urlString string) ([]string, error) {
 	return result, nil
 }
 
-func cleaned(urlString string) string {
+func normalized(urlString string) string {
 	if strings.Contains(urlString, "?") {
-		return strings.Split(urlString, "?")[0]
+		urlString = strings.Split(urlString, "?")[0]
 	}
 	if strings.Contains(urlString, "#") {
-		return strings.Split(urlString, "#")[0]
+		urlString = strings.Split(urlString, "#")[0]
 	}
-	return urlString
+	return strings.TrimSuffix(urlString, "/")
 }
 
 func getDomainUrl(urlStruct *url.URL) string {
 	protocol := urlStruct.Scheme
 	host := urlStruct.Host
 
-	return fmt.Sprintf("%v://%v/", protocol, host)
+	return fmt.Sprintf("%v://%v", protocol, host)
 }

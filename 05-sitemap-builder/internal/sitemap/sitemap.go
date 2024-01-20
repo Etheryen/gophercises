@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 )
 
 const xmlns = "http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -25,10 +26,7 @@ type loc struct {
 
 func Build(urlString string, maxDepth int) ([]byte, error) {
 	normalizedUrl := normalized(urlString)
-	urls, err := bfs(normalizedUrl, maxDepth)
-	if err != nil {
-		return nil, err
-	}
+	urls := bfs(normalizedUrl, maxDepth)
 	return encodeXml(urls)
 }
 
@@ -61,7 +59,7 @@ func encodeXml(urls []string) ([]byte, error) {
 	return result, nil
 }
 
-func bfs(urlString string, maxDepth int) ([]string, error) {
+func bfs(urlString string, maxDepth int) []string {
 	visited := make(map[string]struct{})
 
 	var queue map[string]struct{}
@@ -69,22 +67,33 @@ func bfs(urlString string, maxDepth int) ([]string, error) {
 		urlString: {},
 	}
 
+	var wg sync.WaitGroup
+
 	for i := 0; i <= maxDepth; i++ {
 		queue, nextQueue = nextQueue, make(map[string]struct{})
 		if len(queue) == 0 {
 			break
 		}
+
+		hrefChan := make(chan []string)
+
 		for queuedUrl := range queue {
 			if _, ok := visited[queuedUrl]; ok {
 				continue
 			}
 			visited[queuedUrl] = struct{}{}
 
-			hrefs, err := getValidHrefs(queuedUrl)
-			if err != nil {
-				return nil, err
-			}
+			wg.Add(1)
+			go worker(queuedUrl, hrefChan, &wg)
 
+		}
+
+		go func() {
+			wg.Wait()
+			close(hrefChan)
+		}()
+
+		for hrefs := range hrefChan {
 			for _, href := range hrefs {
 				if _, ok := visited[href]; !ok {
 					nextQueue[href] = struct{}{}
@@ -98,25 +107,39 @@ func bfs(urlString string, maxDepth int) ([]string, error) {
 		result = append(result, visitedUrl)
 	}
 
-	return result, nil
+	return result
 }
 
-func getValidHrefs(urlString string) ([]string, error) {
+func worker(
+	urlString string,
+	hrefChan chan []string,
+	wg *sync.WaitGroup,
+) {
+	defer wg.Done()
+
+	hrefs := getValidHrefs(urlString)
+
+	fmt.Println("done:", urlString)
+
+	hrefChan <- hrefs
+}
+
+func getValidHrefs(urlString string) []string {
 	resp, err := http.Get(urlString)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	r := bytes.NewReader(body)
 	siteLinks, err := links.Parse(r)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	domainUrl := getDomainUrl(resp.Request.URL)
@@ -135,7 +158,7 @@ func getValidHrefs(urlString string) ([]string, error) {
 		}
 	}
 
-	return result, nil
+	return result
 }
 
 func normalized(urlString string) string {

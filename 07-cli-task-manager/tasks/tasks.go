@@ -4,39 +4,35 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"task/database"
 	"time"
 )
-
-type Task struct {
-	Id     int
-	Title  string
-	DoneAt time.Time
-}
-
-var tasksDb []Task = []Task{
-	{1, "yooo", time.Now()},
-	{Id: 2, Title: "bruh"},
-}
 
 func Add(title string) error {
 	if strings.TrimSpace(title) == "" {
 		return errors.New("title cannot be empty")
 	}
 
-	newId := tasksDb[len(tasksDb)-1].Id + 1
+	err := database.CreateTask(title)
+	if err != nil {
+		return err
+	}
 
-	tasksDb = append(tasksDb, Task{Id: newId, Title: title})
 	fmt.Printf("Added \"%v\" to your task list.\n", title)
-
 	return nil
 }
 
-func List() {
-	undone := filterUndone(tasksDb)
+func List() error {
+	allTasks, err := database.GetAllTasks()
+	if err != nil {
+		return err
+	}
+
+	undone := filterUndone(allTasks)
 
 	if len(undone) == 0 {
 		fmt.Println("You have no uncompleted tasks.")
-		return
+		return nil
 	}
 
 	fmt.Println("You have the following tasks:")
@@ -44,10 +40,12 @@ func List() {
 	for i, t := range undone {
 		fmt.Printf("%v. %v\n", i+1, t.Title)
 	}
+
+	return nil
 }
 
-func filterUndone(taskList []Task) []Task {
-	var undone []Task
+func filterUndone(taskList []database.Task) []database.Task {
+	var undone []database.Task
 
 	for _, t := range taskList {
 		if t.DoneAt.IsZero() {
@@ -58,84 +56,75 @@ func filterUndone(taskList []Task) []Task {
 	return undone
 }
 
-// TODO: check if pointer works
 func Do(num int) error {
-	undone := filterUndone(tasksDb)
-
-	if num < 1 || num > len(undone) {
-		return errors.New("invalid task number")
-	}
-
-	id := undone[num-1].Id
-	taskDone, err := getTask(tasksDb, id)
+	allTasks, err := database.GetAllTasks()
 	if err != nil {
 		return err
 	}
-	doTask(tasksDb, id)
 
-	fmt.Printf("You have completed the \"%v\" task.\n", taskDone.Title)
+	undone := filterUndone(allTasks)
 
-	return nil
-}
-
-func getTask(taskList []Task, id int) (Task, error) {
-	for _, t := range taskList {
-		if t.Id == id {
-			return t, nil
-		}
-	}
-
-	return Task{}, errors.New("task not found")
-}
-
-func doTask(taskList []Task, id int) {
-	for i, t := range taskList {
-		if t.Id == id {
-			taskList[i].DoneAt = time.Now()
-		}
-	}
-}
-
-func Remove(num int) error {
-	undone := filterUndone(tasksDb)
 	if num < 1 || num > len(undone) {
 		return errors.New("invalid task number")
 	}
 
-	removed := undone[num-1]
-	tasksDb = withoutTask(tasksDb, num-1)
-	fmt.Printf("You have deleted the \"%v\" task.\n", removed.Title)
+	task := undone[num-1]
+	err = database.DoTask(task.Id)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("You have completed the \"%v\" task.\n", task.Title)
 
 	return nil
 }
 
-func withoutTask(taskList []Task, id int) []Task {
-	result := make([]Task, len(taskList)-1)
-
-	for _, t := range taskList {
-		if t.Id != id {
-			result = append(result, t)
-		}
+func Remove(num int) error {
+	allTasks, err := database.GetAllTasks()
+	if err != nil {
+		return err
 	}
 
-	return result
+	undone := filterUndone(allTasks)
+
+	if num < 1 || num > len(undone) {
+		return errors.New("invalid task number")
+	}
+
+	task := undone[num-1]
+	err = database.RemoveTask(task.Id)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("You have deleted the \"%v\" task.\n", task.Title)
+
+	return nil
 }
 
-func Completed() {
-	completed := filterCompletedToday(tasksDb)
+func Completed() error {
+	allTasks, err := database.GetAllTasks()
+	if err != nil {
+		return err
+	}
+
+	completed := filterCompletedToday(allTasks)
+
 	if len(completed) == 0 {
 		fmt.Println("You haven't completed any tasks today yet.")
-		return
+		return nil
 	}
 
 	fmt.Println("You have finished the following tasks today:")
 	for _, t := range completed {
 		fmt.Printf("- %v\n", t.Title)
 	}
+
+	return nil
 }
 
-func filterCompletedToday(taskList []Task) []Task {
-	var completed []Task
+func filterCompletedToday(taskList []database.Task) []database.Task {
+	var completed []database.Task
 
 	now := time.Now()
 

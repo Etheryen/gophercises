@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -75,7 +74,6 @@ func normalizeAllPhones(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil
@@ -84,34 +82,21 @@ func normalizeAllPhones(db *sql.DB) error {
 func normalizePhone(db *sql.DB, row PhoneNumberRow) error {
 	normalized := phone.Normalize(row.Value)
 
-	duplicateIds, err := getDuplicateIds(db, normalized, row.Id)
-	if err != nil {
-		return err
-	}
-
-	if len(duplicateIds) > 0 {
-		fmt.Printf(
-			"id: %v val: %v normalized is same as ids: %v\n",
-			row.Id,
-			row.Value,
-			duplicateIds,
-		)
-		err = removePhones(db, duplicateIds)
-		if err != nil {
-			return err
-		}
-	}
-
 	if row.Value == normalized {
 		return nil
 	}
 
-	err = updatePhone(db, row.Id, normalized)
+	hasDuplicates, err := hasDuplicates(db, normalized, row.Id)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	if hasDuplicates {
+		fmt.Printf("%v normalized has duplicates\n", row)
+		return removePhone(db, row.Id)
+	}
+
+	return updatePhone(db, row.Id, normalized)
 }
 
 func updatePhone(db *sql.DB, id int, normalized string) error {
@@ -121,42 +106,29 @@ func updatePhone(db *sql.DB, id int, normalized string) error {
 	return err
 }
 
-// TODO: remove only the original, not an array of ids
-func removePhones(db *sql.DB, idsToRemove []int) error {
-	query := fmt.Sprintf("DELETE FROM %v WHERE id = ANY($1)", tablename)
+func removePhone(db *sql.DB, idToRemove int) error {
+	query := fmt.Sprintf("DELETE FROM %v WHERE id = $1", tablename)
 
-	_, err := db.Exec(query, pq.Array(idsToRemove))
+	_, err := db.Exec(query, idToRemove)
 	return err
 }
 
-func getDuplicateIds(db *sql.DB, phoneVal string, phoneId int) ([]int, error) {
+func hasDuplicates(db *sql.DB, phoneVal string, phoneId int) (bool, error) {
 	query := fmt.Sprintf(
-		"SELECT id FROM %v WHERE value = $1 AND id != $2",
+		"SELECT COUNT(*) FROM %v WHERE value = $1 AND id != $2",
 		tablename,
 	)
 
-	rows, err := db.Query(
+	row := db.QueryRow(
 		query,
 		phoneVal,
 		phoneId,
 	)
-	if err != nil {
-		return nil, err
-	}
 
-	var ids []int
+	var duplicates int
+	err := row.Scan(&duplicates)
 
-	for rows.Next() {
-		var id int
-		err = rows.Scan(&id)
-		if err != nil {
-			return nil, err
-		}
-
-		ids = append(ids, id)
-	}
-
-	return ids, nil
+	return duplicates > 0, err
 }
 
 func ReadAll() ([]PhoneNumberRow, error) {

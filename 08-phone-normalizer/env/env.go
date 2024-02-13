@@ -27,6 +27,13 @@ func GetDbInfo() (DbInfo, error) {
 	password := os.Getenv("PASSWORD")
 	dbname := os.Getenv("DBNAME")
 
+	if host == "" || port == "" || user == "" || password == "" ||
+		dbname == "" {
+		return DbInfo{}, errors.New(
+			"required .env fields: HOST, PORT, DBUSER, PASSWORD, DBNAME",
+		)
+	}
+
 	if _, err := strconv.Atoi(port); err != nil {
 		return DbInfo{}, errors.New("port needs to be an integer")
 	}

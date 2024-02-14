@@ -154,11 +154,13 @@ func readAllRows(db *sql.DB) ([]PhoneNumberRow, error) {
 
 	for rows.Next() {
 		var row PhoneNumberRow
-		err = rows.Scan(&row.Id, &row.Value)
-		if err != nil {
+		if err = rows.Scan(&row.Id, &row.Value); err != nil {
 			return nil, err
 		}
 		result = append(result, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil

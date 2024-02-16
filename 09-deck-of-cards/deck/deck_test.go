@@ -87,3 +87,42 @@ func TestDeck(t *testing.T) {
 		t.Errorf("len(cards) = %v, want %v", len(d.Cards), 13*4*n)
 	}
 }
+
+func TestDealCards(t *testing.T) {
+	d := deck.New().
+		DecksNumber(3).
+		Filtered(func(filterCard deck.Card) bool {
+			return filterCard.Rank > deck.Ten && filterCard.Suit == deck.Clubs
+		})
+
+	hand1 := d.DealCards(2)
+	hand2 := d.DealCards(2)
+
+	want1 := []deck.Card{
+		{Suit: deck.Clubs, Rank: deck.Jack},
+		{Suit: deck.Clubs, Rank: deck.Queen},
+	}
+	want2 := []deck.Card{
+		{Suit: deck.Clubs, Rank: deck.King},
+		{Suit: deck.Clubs, Rank: deck.Jack},
+	}
+	wantRemaining := []deck.Card{
+		{Suit: deck.Clubs, Rank: deck.Queen},
+		{Suit: deck.Clubs, Rank: deck.King},
+		{Suit: deck.Clubs, Rank: deck.Jack},
+		{Suit: deck.Clubs, Rank: deck.Queen},
+		{Suit: deck.Clubs, Rank: deck.King},
+	}
+
+	if !reflect.DeepEqual(hand1, want1) {
+		t.Errorf("hand1 = %v, want %v", hand1, want1)
+	}
+
+	if !reflect.DeepEqual(hand2, want2) {
+		t.Errorf("hand2 = %v, want %v", hand2, want2)
+	}
+
+	if !reflect.DeepEqual(d.Cards, wantRemaining) {
+		t.Errorf("d.Cards = %v, want %v", d.Cards, wantRemaining)
+	}
+}

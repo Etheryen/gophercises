@@ -22,6 +22,12 @@ func New() Deck {
 	return deck
 }
 
+func (d *Deck) DealCards(n int) []Card {
+	dealt := d.Cards[:n]
+	d.Cards = d.Cards[n:]
+	return dealt
+}
+
 func (oldDeck Deck) DecksNumber(n int) Deck {
 	var d Deck
 	for i := 0; i < n; i++ {

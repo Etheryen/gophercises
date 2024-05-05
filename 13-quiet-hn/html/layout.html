@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiet HN</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css"
+    />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Quiet Hacker News</h1>
+      <div class="grid">
+        <p>Generated in {{.StoriesData.Time}}</p>
+        <p>Cached for {{.CacheTime}}</p>
+        <p>Update in {{.UpdateIn}}</p>
+      </div>
+      <ol>
+        {{range .StoriesData.Stories}}
+        <li><a href="{{.URL}}">{{.Title}}</a> ({{.Domain}})</li>
+        {{end}}
+      </ol>
+    </main>
+  </body>
+</html>
